@@ -27,31 +27,28 @@ def home():
 @cross_origin()
 def start():
     response = request.get_json()
+
     project_name = response.get('project_name')
-    cluster_a_file = response['file_a']['name']
-    cluster_b_file = response['file_b']['name']
+    cluster_a_file = response.get('file_a').get('name')
+    cluster_b_file = response.get('file_b').get('name')
 
-    hdfs_obj = HDFSConnector()
-
-    if not hdfs_obj.check_hdfs():
-        app.logger.error('The HDFS is not connected')
-        response = app.response_class(
-            status=500,
-            message=json.dumps({"message": "The HDFS did not respond."})
+    if project_name is None or cluster_a_file is None or cluster_b_file is None:
+        return app.response_class(
+            response=json.dumps({"message": 'Files or Project name are not defined.'}),
+            status=400,
         )
-        return response
-    app.logger.info("Connected to HDFS.")
 
-    response = requests.get(url=f"http://snf-33322.ok-kno.grnetcloud.net:9500/take-file/pretransformed_data?file={cluster_a_file}")
+    response = requests.get(url=f"http://hdfs:9500/take-file/pretransformed_data?file={cluster_a_file}")
     pd.read_csv(io.StringIO(response.content.decode('utf-8'))).to_csv(f'/opt/workspace/pretransformed_data/alice_{cluster_a_file}')
 
-    response = requests.get(url=f"http://snf-33343.ok-kno.grnetcloud.net:9500/take-file/pretransformed_data?file={cluster_b_file}")
+    response = requests.get(url=f"http://hdfs:9500/take-file/pretransformed_data?file={cluster_b_file}")
     pd.read_csv(io.StringIO(response.content.decode('utf-8'))).to_csv(f'/opt/workspace/pretransformed_data/bob_{cluster_b_file}')
 
     try:
         spark = ThesisSparkClass(project_name=project_name,
                                  file_a=cluster_a_file,
-                                 file_b=cluster_b_file)
+                                 file_b=cluster_b_file,
+                                 logger=app)
         spark.start_etl()
 
 
@@ -59,19 +56,14 @@ def start():
         app.logger.info(f"ERROR : {e}")
         return app.response_class(
             status=500,
-            message=json.dumps({"message": f"There was an unexpected error!"})
+            response=json.dumps({"message": f"There was an unexpected error!"})
         )
 
-    data = {
-        "message": 'The join operation has finished.'
-    }
-
-    response = app.response_class(
-        response=json.dumps(data),
+    return app.response_class(
+        response=json.dumps({"message": 'The join operation has finished.'}),
         status=200,
         mimetype='application/json'
     )
-    return response
 
 
 if __name__ == '__main__':

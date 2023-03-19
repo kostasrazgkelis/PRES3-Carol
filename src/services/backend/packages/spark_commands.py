@@ -1,5 +1,8 @@
+import multiprocessing
 import socket
 import os
+
+import pandas as pd
 from pyspark.sql import SparkSession, DataFrame
 from pyspark import SparkConf
 from pyspark.sql.functions import col
@@ -12,18 +15,22 @@ class ThesisSparkClass:
     def __init__(self,
                  project_name: str,
                  file_a: str,
-                 file_b: str):
+                 file_b: str,
+                 logger):
 
+        self.logger = logger
         self.project_name = project_name
         self.file_a = file_a
         self.file_b = file_b
 
+        self.dataframe = None
         self.matched_data = None
         self.metrics_dict = None
         self.df_1 = None
         self.df_2 = None
         self.matching_field = ''
         self.df_columns = []
+        self.numPartitions = 1_000
 
         spark_driver_host = socket.gethostname()
         self.spark_conf = SparkConf() \
@@ -44,6 +51,7 @@ class ThesisSparkClass:
                                  .config(conf=self.spark_conf)\
                                  .enableHiveSupport() \
                                  .getOrCreate()
+        self.spark.sparkContext.accumulator(0)
 
     def set_matching_field(self):
         import re
@@ -62,10 +70,14 @@ class ThesisSparkClass:
         return self.spark.read.csv(path=f"{SPARK_DISTRIBUTED_FILE_SYSTEM}/{file_name}", sep=",", header=True)
 
     def extract_data(self):
-        self.df_1 = self.read_csv(file_name=f'pretransformed_data/alice_{self.file_a}')
-        self.df_2 = self.read_csv(file_name=f'pretransformed_data/bob_{self.file_b}')
+        self.logger.logger.info(f"started extracting data")
+        self.df_1 = self.read_csv(file_name=f'pretransformed_data/alice_{self.file_a}').coalesce(numPartitions=self.numPartitions)
+        self.df_2 = self.read_csv(file_name=f'pretransformed_data/bob_{self.file_b}').coalesce(numPartitions=self.numPartitions)
+        #
+        self.logger.logger.info(f"finished extracting data")
 
     def transform_data(self):
+        self.logger.logger.info(f"started transforming data")
         self.set_matching_field()
 
         condition = self.df_1.columns
@@ -80,19 +92,27 @@ class ThesisSparkClass:
         self.matched_data = self.matched_data.drop(col("MatchingFieldDF2"))
         self.matched_data = self.matched_data.withColumnRenamed("MatchingFieldDF1", self.matching_field)
         self.matched_data = self.matched_data.drop(*(colms for colms in self.matched_data.columns if colms not in self.df_columns))
+        self.logger.logger.info(f"finished transforming data")
 
     def load_data(self):
-        # self.matched_data.coalesce(1).write.format('com.databricks.spark.csv').mode('overwrite').save(
-        #     SPARK_DISTRIBUTED_FILE_SYSTEM + 'joined_data', header='true')
-        directory = os.path.join(SPARK_DISTRIBUTED_FILE_SYSTEM + 'joined_data', f'{self.project_name.lower()}')
+        self.logger.logger.info(f"started loading data")
+
+        directory = os.path.join(SPARK_DISTRIBUTED_FILE_SYSTEM, f'{self.project_name.lower()}')
         if not os.path.exists(directory):
             os.mkdir(directory)
         path = os.path.join(directory, 'results.csv')
-        self.matched_data.toPandas().to_csv(path, index=False)
+
+        # with multiprocessing.Pool() as pool:
+        #     pandas_dfs = pool.map(self.matched_data.toPandas(), [self.matched_data])
+        #     pool.starmap(self.matched_data.to_csv(path, index=False), [(pandas_df, "output.csv") for pandas_df in pandas_dfs])
+
+        # self.matched_data.coalesce(numPartitions=1).toPandas().to_csv(path, index=False)
+
+        self.matched_data.coalesce(numPartitions=self.numPartitions).write.csv(directory, header=True, mode='overwrite')
+        self.logger.logger.info(f"finished loading data")
 
     def start_etl(self):
         self.extract_data()
         self.transform_data()
-        values = self.load_data()
+        self.load_data()
         self.spark.stop()
-        return values

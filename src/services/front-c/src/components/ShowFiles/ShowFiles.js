@@ -245,10 +245,7 @@ export default function ShowFiles({filesA, setFilesA, filesB, setFilesB}) {
         console.log('Post Res', postRes);
         setLoadingJoin(true);
         try{
-            /* let res = await join(postRes);
-            console.log('Response ', res); */
             const response = await joinFiles(postRes);
-            console.log('RESPONSE ', response);
             setResults(response);
             setLoadingJoin(false);
 
