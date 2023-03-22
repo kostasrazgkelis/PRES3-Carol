@@ -44,6 +44,8 @@ def start():
     response = requests.get(url=f"http://hdfs:9500/take-file/pretransformed_data?file={cluster_b_file}")
     pd.read_csv(io.StringIO(response.content.decode('utf-8'))).to_csv(f'/opt/workspace/pretransformed_data/bob_{cluster_b_file}')
 
+    app.logger.info(f"Downloaded")
+
     try:
         spark = ThesisSparkClass(project_name=project_name,
                                  file_a=cluster_a_file,
