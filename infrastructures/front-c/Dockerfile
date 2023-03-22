@@ -11,8 +11,4 @@ RUN npm install --save react-helmet
 
 COPY ./src/services/front-c /src
 
-ARG REACT_APP_URI_HOST
-
-ENV REACT_APP_URI_HOST=$REACT_APP_URI_HOST
-
 CMD ["npm", "start"]
