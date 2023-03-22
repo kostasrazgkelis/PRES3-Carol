@@ -38,10 +38,10 @@ def start():
             status=400,
         )
 
-    response = requests.get(url=f"http://hdfs:9500/take-file/pretransformed_data?file={cluster_a_file}")
+    response = requests.get(url=f"http://snf-34396.ok-kno.grnetcloud.net:9500/take-file/pretransformed_data?file={cluster_a_file}")
     pd.read_csv(io.StringIO(response.content.decode('utf-8'))).to_csv(f'/opt/workspace/pretransformed_data/alice_{cluster_a_file}')
 
-    response = requests.get(url=f"http://hdfs:9500/take-file/pretransformed_data?file={cluster_b_file}")
+    response = requests.get(url=f"http://snf-34397.ok-kno.grnetcloud.net:9500/take-file/pretransformed_data?file={cluster_b_file}")
     pd.read_csv(io.StringIO(response.content.decode('utf-8'))).to_csv(f'/opt/workspace/pretransformed_data/bob_{cluster_b_file}')
 
     app.logger.info(f"Downloaded")
