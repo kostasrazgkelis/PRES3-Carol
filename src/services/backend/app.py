@@ -56,7 +56,7 @@ def start():
         app.logger.info(f"ERROR : {e}")
         return app.response_class(
             status=500,
-            response=json.dumps({"message": f"There was an unexpected error!"})
+            response=json.dumps({"message": f"There was an unexpected error! {e}"})
         )
 
     return app.response_class(
