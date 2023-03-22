@@ -35,7 +35,7 @@ class ThesisSparkClass:
         spark_driver_host = socket.gethostname()
         self.spark_conf = SparkConf() \
             .setAll([
-            ('spark.master', f'spark://spark-master:7077'),
+            ('spark.master', 'local[*]'),
             ('spark.driver.bindAddress', '0.0.0.0'),
             ('spark.driver.host', spark_driver_host),
             ('spark.app.name', self.project_name),
